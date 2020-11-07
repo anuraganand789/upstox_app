@@ -13,8 +13,12 @@ import java.util.logging.Logger;
 
 import java.time.Duration;
 
+import com.upstox.queue.OHLCBarDataQueue;
 import com.upstox.queue.PacketsBlockingQueue;
 
+
+//TODO: log the event packets
+//TODO: fix the bar numbers
 public class FiniteStateMachine implements Runnable{
 
     private static final Logger LOGGER = Logger.getLogger(FiniteStateMachine.class.getName());
@@ -52,13 +56,13 @@ public class FiniteStateMachine implements Runnable{
 
 	   expireTheStocks(stockName, timestampUTC);
 	   updateOHLC(ohlcData);
-           updateBarNum(stockName, timestampUTC);
 	   emitEmptyEvents(timestampUTC);
 	}
     }
 
     private void pushEmptyEventToQueue(final String stockName){
     }
+
     private void emitEmptyEvents(final long currentTimeStamp){
         for(final String stockName : setOfStocks){
 	    if(setOfStocksWithActiveInterval.contains(stockName)){ continue; }
@@ -89,7 +93,7 @@ public class FiniteStateMachine implements Runnable{
     }
     
     private void updateOHLC(final OHLCData ohlcData){
-	final String stockName    = ohlcData.getStockName();
+        final String stockName    = ohlcData.getStockName();
 	final long   timestampUTC = ohlcData.getTimestampUTC();
 
 	final double currentStockPrice  = ohlcData.getPriceOfTrade();
@@ -130,9 +134,6 @@ public class FiniteStateMachine implements Runnable{
         return currentDuration.minus(lastDuration).toSecondsPart();
     }
 
-    private void updateBarNum(final String stockName, final long timestampUTC){
-    }
-
     private void expireTheStocks(final String stockName, final long currentTime){
        Iterator<String> iterator = setOfStocksWithActiveInterval.iterator();
        String currentStockName;
@@ -151,13 +152,25 @@ public class FiniteStateMachine implements Runnable{
        //after that the value is no needed.
     }
     
-    //TODO: impelement this function
     private void pushToOHLCQueue(final OHLCEvent ohlcEvent){
+        try{
+            OHLCBarDataQueue.write(ohlcEvent);
+        }catch(InterruptedException ex){
+	    LOGGER.info("Interrupted Exception " + ex.getMessage());
+        }
     }
 
-    //TODO: implement this funciton
     private OHLCEvent createEventObject(final String stockName){
-        return null;
+        final OHLCEvent event = new OHLCEvent(
+					       mapOfStockToOpen.get(stockName),
+					       mapOfStockToHigh.get(stockName),
+					       mapOfStockToLow.get(stockName),
+					       mapOfStockToClose.get(stockName),
+					       mapOfStockToVolume.get(stockName),
+					       stockName,
+					       mapOfStockToBarNumber.get(stockName)
+	                                     );
+        return event;
     }
     
     private void closeTheStock(final String stockName){
