@@ -3,9 +3,9 @@ package com.upstox.queue;
 import java.util.queue.ArrayBlockingQueue;
 import com.upstox.model.OHLCData;
 
-public class PacketsBlockingQueue implements Runnable{
+public class PacketsBlockingQueue{
 
-    private final int INITIALSIZE = 10_000;
+    private final int INITIALSIZE = 1_000;
     private final static ArrayBlockingQueue<OHLCData> packetsQueue = new ArrayBlockingQueue<>(INITIALSIZE);
 
     public static OHLCData read(){
@@ -14,12 +14,5 @@ public class PacketsBlockingQueue implements Runnable{
 
     public static write(final OHLCData ohlcData){ 
         packetQueue.add(ohlcData);
-    }
-
-    @Override
-    public void run(){
-        while(true){
-	    read();
-	}
     }
 }

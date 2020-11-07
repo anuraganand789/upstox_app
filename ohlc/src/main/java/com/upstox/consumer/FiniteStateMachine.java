@@ -1,6 +1,8 @@
 package com.upstox.consumer;
 
 public class FiniteStateMachine implements Runnable{
+    private void consume(){
+    }
     public OHLCData generateIntervalData(){
 	computeDataPer15Seconds();
 	constructBarChartData();
@@ -15,8 +17,6 @@ public class FiniteStateMachine implements Runnable{
 
     @Override
     public void run(){
-        while(true){
-	    pushComputedDataToSocketQueue();
-	}
+        while(true){ consume(); }
     }
 }

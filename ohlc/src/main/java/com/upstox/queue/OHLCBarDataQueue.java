@@ -5,7 +5,6 @@ import java.util.ArrayBlockingQueue;
 
 public class OHLCBarDataQueue{
     //TODO : add loggers in all the java file
-    //TODO : add code to convert data from model to json
     //TODO : run code with loggr to print the data with regular interval
     private static final INITIALSIZE = 10_000;
     private static final ArrayBlockingQueue<OHLCData> ohlcBarData = new ArrayBlockingQueue(INITIALSIZE);
