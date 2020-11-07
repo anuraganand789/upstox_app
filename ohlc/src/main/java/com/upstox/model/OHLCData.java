@@ -28,6 +28,15 @@ public class OHLCData{
 
     public long getTimestampUTC() { return this.timestampUTC; }
 
+    public int hashCode() {
+        return stockName.hashCode();
+    }
+
+    public boolean equals(final Object obj){
+	if(obj instanceof OHLCData ohlc) return ohlc.getStockName.equals(this.stockName);
+        return false;
+    }
+
     @Override
     public String toString(){
         return "StockName " + stockName + 
