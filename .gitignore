@@ -24,3 +24,6 @@ hs_err_pid*
 
 #vim swap files
 *.swp
+
+#do not track output folder
+target
