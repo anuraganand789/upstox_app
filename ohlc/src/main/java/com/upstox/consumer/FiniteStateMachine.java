@@ -50,15 +50,22 @@ public class FiniteStateMachine implements Runnable{
 	final double currentStockPrice  = ohlcData.getPriceOfTrade();
 	final double currentTradeVolume = ohlcData.getQuantityTraded();
 
-        mapOfStockToHigh  .computeIfPresent(stockName,   (key, oldValue) -> Double.max(oldValue.doubleValue(), currentStockPrice));
-        mapOfStockToLow   .computeIfPresent(stockName,   (key, oldValue) -> Double.min(oldValue.doubleValue(), currentStockPrice));
-        mapOfStockToVolume.computeIfPresent(stockName,   (key, oldValue) -> Double.sum(oldValue.doubleValue(), currentTradeVolume));
+	if(setOfStockWithActiveInterval.contains(stockName)){
+	    final double oldHighPrice = mapOfStockToHigh.get(stockName);
+	    if(currentStockPrice > oldHighPrice) { mapOfStockToHigh.put(stockName, currentStockPrice); } 
 
-        mapOfStockToOpen  .computeIfAbsent(stockName, (key) -> currentStockPrice); 
-        mapOfStockToHigh  .computeIfAbsent(stockName, (key) -> currentStockPrice);
-        mapOfStockToLow   .computeIfAbsent(stockName, (key) -> currentStockPrice);
-        mapOfStockToClose .computeIfAbsent(stockName, (key) -> 0);
-        mapOfStockToVolume.computeIfAbsent(stockName, (key) -> currentTradeVolume);
+	    final double oldLowPrice = mapOfStockToLow.get(stockName);
+	    if(currentStockPrice < oldLowPrice) { mapOfStockToLow.put(stockName, currentStockPrice); }
+
+            mapOfStockToVolume.put(stockName, Double.sum(currentTradeVolume, mapOfStockToVolume.get(stockName));
+	    return;
+	}
+
+        mapOfStockToOpen  .put(stockName, currentStockPrice); 
+        mapOfStockToHigh  .put(stockName, currentStockPrice);
+        mapOfStockToLow   .put(stockName, currentStockPrice);
+        mapOfStockToClose .put(stockName, 0);
+        mapOfStockToVolume.put(stockName, currentTradeVolume);
     }
 
     private void updateState(final String stockName, final long timestampUTC){
