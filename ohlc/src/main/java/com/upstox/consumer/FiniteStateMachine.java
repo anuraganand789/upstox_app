@@ -57,9 +57,6 @@ public class FiniteStateMachine implements Runnable{
 	}
     }
 
-    private void updateOHLC(final OHLCData data){
-    }
-
     private void pushEmptyEventToQueue(final String stockName){
     }
     private void emitEmptyEvents(final long currentTimeStamp){
@@ -91,7 +88,7 @@ public class FiniteStateMachine implements Runnable{
         this.mapOfStockToBarNumber.computeIfPresent(stockName, (key, value) -> value + increaseBy);
     }
     
-    private void updatOHLC(final OHLCData ohlcData){
+    private void updateOHLC(final OHLCData ohlcData){
 	final String stockName    = ohlcData.getStockName();
 	final long   timestampUTC = ohlcData.getTimestampUTC();
 
