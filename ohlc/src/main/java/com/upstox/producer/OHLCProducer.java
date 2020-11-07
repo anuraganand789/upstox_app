@@ -2,6 +2,9 @@ package com.upstox.producer;
 
 import java.util.List;
 
+import java.io.File;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.io.IOException;
 
@@ -10,8 +13,6 @@ import java.nio.file.Path;
 
 import java.util.logging.Logger;
 import java.util.logging.Level;
-
-import java.net.URISyntaxException;
 
 import org.json.JSONObject;
 
@@ -22,25 +23,31 @@ public class OHLCProducer implements Runnable{
 
     private static final Logger LOGGER = Logger.getLogger(OHLCProducer.class.getName());
 
-    private Path getJsonPath() throws URISyntaxException{
-	final ClassLoader classLoader = ClassLoader.getSystemClassLoader();
-	final Path pathToJsonFile = Path.of(classLoader.getResource("trades.json").toURI());
-	return pathToJsonFile;
+    private InputStream getJsonInputStream() throws IOException{
+	final InputStream ios = getClass().getClassLoader().getResourceAsStream("trades.json");
+	LOGGER.info("Number of kilo bytes that can be read " + ios.available() / 1024 + " kB");
+        return ios;
     }
 
-    private void readFile() throws URISyntaxException{
-        final Path pathToJsonFile = getJsonPath();
+    private void readFile(){
 
-	try(BufferedReader bufferedReader = Files.newBufferedReader(pathToJsonFile)){
+	try(  InputStream ioStream          = getJsonInputStream();
+	      InputStreamReader ioReader    = new InputStreamReader(ioStream);
+	      BufferedReader bufferedReader = new BufferedReader(ioReader)
+	    ){
 
             String currentLine;
+            JSONObject jsonObject;
 
 	    while((currentLine = bufferedReader.readLine()) != null){
-	        addToQueue(jsonToOHLCData(new JSONObject(currentLine)));
+		LOGGER.info(currentLine);
+		jsonObject = new JSONObject(currentLine);
+	        addToQueue(jsonToOHLCData(jsonObject));
 	    }
 
 	}catch(IOException ioe) {
 	    LOGGER.log(Level.SEVERE, ioe.getMessage());
+	    ioe.printStackTrace();
 	}
     }
     
@@ -62,10 +69,16 @@ public class OHLCProducer implements Runnable{
     }
 
     private void produce(){
+        readFile(); 
+    }
+
+    public static void main(final String ... args){
+       Thread thread = new Thread(new OHLCProducer()); 
+       thread.start();
     }
 
     @Override
     public void run(){
-	while(true){ produce(); }
+	produce(); 
     }
 }

@@ -1,18 +1,27 @@
 package com.upstox.queue;
 
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import java.util.logging.Logger;
+
 import com.upstox.model.OHLCData;
 
 public class PacketsBlockingQueue{
-
+    private static final AtomicInteger noOfPacketReceived = new AtomicInteger(0);
+    private static final AtomicInteger noOfPacketsDelievered = new AtomicInteger(0);
+    private static final Logger LOGGER = Logger.getLogger(PacketsBlockingQueue.class.getName());
     private final static int INITIALSIZE = 1_000;
     private final static ArrayBlockingQueue<OHLCData> packetsQueue = new ArrayBlockingQueue<>(INITIALSIZE);
 
     public static OHLCData read() throws InterruptedException{
-        return packetsQueue.take();
+	OHLCData ohlcData = packetsQueue.take();
+	LOGGER.info("Delievered Packet " + ohlcData + ", total no of packets delivered " + noOfPacketsDelievered.incrementAndGet());
+        return ohlcData;
     }
 
     public static void write(final OHLCData ohlcData) throws InterruptedException{ 
         packetsQueue.put(ohlcData);
+        LOGGER.info("Received a new packet " + ohlcData + ", total no of packets received " + noOfPacketReceived.incrementAndGet());
     }
 }

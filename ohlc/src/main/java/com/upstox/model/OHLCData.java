@@ -27,4 +27,12 @@ public class OHLCData{
     public double getQuantityTraded() { return this.quantityTraded; }
 
     public long getTimestampUTC() { return this.timestampUTC; }
+
+    @Override
+    public String toString(){
+        return "StockName " + stockName + 
+	       ", Price OF Trade " + priceOfTrade + 
+	       ", Quantitytraded " + quantityTraded + 
+	       ", TimestampUTC " + timestampUTC;
+    }
 }
