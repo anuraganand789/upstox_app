@@ -3,44 +3,92 @@ package com.upstox.consumer;
 import com.upstox.model.OHLCData;
 import com.upstox.model.OHLCEvent;
 
-import java.util.Set;
-import java.util.Map;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.Iterator;
 import java.util.logging.Logger;
+
+import java.time.Duration;
 
 import com.upstox.queue.PacketsBlockingQueue;
 
 public class FiniteStateMachine implements Runnable{
 
     private static final Logger LOGGER = Logger.getLogger(FiniteStateMachine.class.getName());
+   
+    private final PacketsBlockingQueue blockingQueue;
 
     private final Set<String> setOfStocks = new HashSet<>(100);
+    private final Set<String> setOfStocksWithActiveInterval = new HashSet<>(100);
 
-    private final Map<String, Double>    mapOfStockToOpen        = new LinkedHashMap<>();
-    private final Map<String, Double>    mapOfStockToHigh        = new LinkedHashMap<>();
-    private final Map<String, Double>    mapOfStockToLow         = new LinkedHashMap<>();
-    private final Map<String, Double>    mapOfStockToClose       = new LinkedHashMap<>();
-    private final Map<String, Double>    mapOfStockToVolume      = new LinkedHashMap<>();
-    private final Map<String, Integer>   mapOfStockToBarNumber   = new LinkedHashMap<>();
+    private final Map<String, Double>     mapOfStockToOpen        = new LinkedHashMap<>();
+    private final Map<String, Double>     mapOfStockToHigh        = new LinkedHashMap<>();
+    private final Map<String, Double>     mapOfStockToLow         = new LinkedHashMap<>();
+    private final Map<String, Double>     mapOfStockToClose       = new LinkedHashMap<>();
+    private final Map<String, Double>     mapOfStockToVolume      = new LinkedHashMap<>();
+    private final Map<String, Double>     mapOfStockToLastPrice   = new LinkedHashMap<>();
+    private final Map<String, Long>       mapOfStockToTimeStamp   = new LinkedHashMap<>();
+    private final Map<String, Integer>    mapOfStockToBarNumber   = new LinkedHashMap<>();
+
 
     private final Map<String, Long>       mapOfStockToFirstTrade  = new LinkedHashMap<>();
     private final Map<String, Boolean>    mapOfStockToExpiration  = new LinkedHashMap<>();
-    private final Set<String>             setOfStockWithActiveInterval = new HashSet<>();
-    private final Map<String, StockState> mapOfStockToState       = new LinkedHashMap<>();
     private final Map<String, OHLCEvent>  mapOfStockToEvent       = new LinkedHashMap<>();
+
+    public FiniteStateMachine(final PacketsBlockingQueue blockingQueue){
+        this.blockingQueue = blockingQueue;
+    }
 
     private void consume() throws InterruptedException{
 	OHLCData ohlcData;
         while(true){
 	   ohlcData = PacketsBlockingQueue.read(); 
+
 	   final String stockName    = ohlcData.getStockName();
 	   final long   timestampUTC = ohlcData.getTimestampUTC();
-	   expireTheStocks(timestampUTC);
-	   updateBarNum(timestampUTC);
-	  // updateState(stockName, timestampUTC);
+
+	   expireTheStocks(stockName, timestampUTC);
 	   updateOHLC(ohlcData);
+           updateBarNum(stockName, timestampUTC);
+	   emitEmptyEvents(timestampUTC);
 	}
+    }
+
+    private void updateOHLC(final OHLCData data){
+    }
+
+    private void pushEmptyEventToQueue(final String stockName){
+    }
+    private void emitEmptyEvents(final long currentTimeStamp){
+        for(final String stockName : setOfStocks){
+	    if(setOfStocksWithActiveInterval.contains(stockName)){ continue; }
+            int seconds = calculateTheTick(currentTimeStamp, mapOfStockToTimeStamp.get(stockName)); 
+	    if(seconds > 14){
+	        pushEmptyEventToQueue(stockName);
+		updateLastTimeStamp(stockName, currentTimeStamp);
+	    }
+	}
+    }
+
+    private void updateLastTimeStamp(final String stockName, final long currentTimestamp){
+        final long lastTimestamp      = mapOfStockToTimeStamp.get(stockName);
+	final Duration lastTimeDuration = Duration.ofNanos(lastTimestamp);
+	int diffInSeconds = calculateTheTick(currentTimestamp, lastTimestamp);
+        
+	int divisor;
+	while((divisor = diffInSeconds / 15) > 0){
+	    diffInSeconds -= 15;
+            lastTimeDuration.plusSeconds(15);
+	    incrementBarNum(stockName, 1);
+	    mapOfStockToTimeStamp.put(stockName, lastTimeDuration.toNanos());
+	}
+    }
+
+    private void incrementBarNum(final String stockName, final int increaseBy){
+        this.mapOfStockToBarNumber.computeIfPresent(stockName, (key, value) -> value + increaseBy);
     }
     
     private void updatOHLC(final OHLCData ohlcData){
@@ -50,55 +98,73 @@ public class FiniteStateMachine implements Runnable{
 	final double currentStockPrice  = ohlcData.getPriceOfTrade();
 	final double currentTradeVolume = ohlcData.getQuantityTraded();
 
-	if(setOfStockWithActiveInterval.contains(stockName)){
+	mapOfStockToLastPrice.put(stockName, currentStockPrice);
+
+	if(setOfStocksWithActiveInterval.contains(stockName)){
 	    final double oldHighPrice = mapOfStockToHigh.get(stockName);
 	    if(currentStockPrice > oldHighPrice) { mapOfStockToHigh.put(stockName, currentStockPrice); } 
 
 	    final double oldLowPrice = mapOfStockToLow.get(stockName);
 	    if(currentStockPrice < oldLowPrice) { mapOfStockToLow.put(stockName, currentStockPrice); }
 
-            mapOfStockToVolume.put(stockName, Double.sum(currentTradeVolume, mapOfStockToVolume.get(stockName));
+            mapOfStockToVolume.put(stockName, Double.sum(currentTradeVolume, mapOfStockToVolume.get(stockName)));
 	    return;
 	}
 
-        mapOfStockToOpen  .put(stockName, currentStockPrice); 
-        mapOfStockToHigh  .put(stockName, currentStockPrice);
-        mapOfStockToLow   .put(stockName, currentStockPrice);
-        mapOfStockToClose .put(stockName, 0);
-        mapOfStockToVolume.put(stockName, currentTradeVolume);
+        mapOfStockToOpen     .put(stockName, currentStockPrice); 
+        mapOfStockToHigh     .put(stockName, currentStockPrice);
+        mapOfStockToLow      .put(stockName, currentStockPrice);
+        mapOfStockToClose    .put(stockName, 0.0);
+        mapOfStockToVolume   .put(stockName, currentTradeVolume);
+	mapOfStockToTimeStamp.put(stockName, timestampUTC);
     }
 
     private void updateState(final String stockName, final long timestampUTC){
         if(setOfStocks.add(stockName)) { 
 	    mapOfStockToFirstTrade.put(stockName, timestampUTC);
-	    mapOfStockToBarNum(stockName, 1);
+	    incrementBarNum(stockName, 1);
 	}
-        mapOfStockState.put(stockName, ohlcData);
+        //mapOfStockState.put(stockName, ohlcData);
     }
 
-    private int calculateTheTick(final String stockName, final long timestampUTC){
-        //return timestamp diff in seconds
+    private int calculateTheTick(final long currentTimestamp, final long lastTimestamp){
+        final Duration lastDuration = Duration.ofNanos(lastTimestamp); 
+	final Duration currentDuration = Duration.ofNanos(currentTimestamp);
+        return currentDuration.minus(lastDuration).toSecondsPart();
     }
 
-    private void updateBarNum(final long timestampUTC){
-        //starts from 1, and increases by 1 for each passed tick
+    private void updateBarNum(final String stockName, final long timestampUTC){
     }
 
-    private void exprireTheStocks(final long currentTime){
+    private void expireTheStocks(final String stockName, final long currentTime){
+       Iterator<String> iterator = setOfStocksWithActiveInterval.iterator();
+       String currentStockName;
+       while(iterator.hasNext()){
+           currentStockName = iterator.next(); 
+           int noOfSecondsPassed = calculateTheTick(currentTime, mapOfStockToTimeStamp.get(stockName));
+	   if(noOfSecondsPassed > 14) { 
+	       iterator.remove(); 
+	       //close the stock and put it in the Event Queue of Socket 
+	       closeTheStock(stockName);
+	       final OHLCEvent ohlcEvent = createEventObject(stockName);
+	       pushToOHLCQueue(ohlcEvent);
+	   } 
+       }
        //if a stock has closed then remove it from map of stock to state map, we only need the state for 15 seconds interval,
        //after that the value is no needed.
     }
+    
+    //TODO: impelement this function
+    private void pushToOHLCQueue(final OHLCEvent ohlcEvent){
+    }
 
-    public OHLCData generateIntervalData(){
-	computeDataPer15Seconds();
-	constructBarChartData();
+    //TODO: implement this funciton
+    private OHLCEvent createEventObject(final String stockName){
         return null;
     }
-
-    private void computeDataPer15Seconds(){
-    }
-
-    private void constructBarChartData(){
+    
+    private void closeTheStock(final String stockName){
+        mapOfStockToClose.put(stockName, mapOfStockToLastPrice.get(stockName));
     }
 
     @Override

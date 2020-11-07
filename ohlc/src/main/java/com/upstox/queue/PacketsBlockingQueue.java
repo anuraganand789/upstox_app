@@ -8,9 +8,11 @@ import java.util.logging.Logger;
 import com.upstox.model.OHLCData;
 
 public class PacketsBlockingQueue{
+    private static final Logger LOGGER = Logger.getLogger(PacketsBlockingQueue.class.getName());
+
     private static final AtomicInteger noOfPacketReceived = new AtomicInteger(0);
     private static final AtomicInteger noOfPacketsDelievered = new AtomicInteger(0);
-    private static final Logger LOGGER = Logger.getLogger(PacketsBlockingQueue.class.getName());
+
     private final static int INITIALSIZE = 1_000;
     private final static ArrayBlockingQueue<OHLCData> packetsQueue = new ArrayBlockingQueue<>(INITIALSIZE);
 
