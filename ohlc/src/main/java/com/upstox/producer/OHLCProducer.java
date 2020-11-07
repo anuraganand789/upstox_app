@@ -11,36 +11,37 @@ import java.nio.file.Path;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 
+import java.net.URISyntaxException;
+
 import org.json.JSONObject;
+
+import com.upstox.queue.PacketsBlockingQueue;
 import com.upstox.model.OHLCData;
 
 public class OHLCProducer implements Runnable{
 
     private static final Logger LOGGER = Logger.getLogger(OHLCProducer.class.getName());
-    private static int INITIALSIZE = 1_00_000;
 
-    private Path getJsonPath(){
+    private Path getJsonPath() throws URISyntaxException{
 	final ClassLoader classLoader = ClassLoader.getSystemClassLoader();
-	final Path pathToJsonFile = classLoader.getResource("trades.json");
+	final Path pathToJsonFile = Path.of(classLoader.getResource("trades.json").toURI());
 	return pathToJsonFile;
     }
 
-    private List<OHLCData> readFile(){
+    private void readFile() throws URISyntaxException{
         final Path pathToJsonFile = getJsonPath();
 
-	try(BufferedReader bufferedReader = Files.newBufferedReader(jsonFilePath)){
+	try(BufferedReader bufferedReader = Files.newBufferedReader(pathToJsonFile)){
 
             String currentLine;
 
 	    while((currentLine = bufferedReader.readLine()) != null){
-	        addToQueue(jsonToOHLCData(new JSONObject(currentLine));
+	        addToQueue(jsonToOHLCData(new JSONObject(currentLine)));
 	    }
 
 	}catch(IOException ioe) {
 	    LOGGER.log(Level.SEVERE, ioe.getMessage());
 	}
-
-	return listOfOhlcData;
     }
     
     private OHLCData jsonToOHLCData(final JSONObject jsonObject){
@@ -53,7 +54,11 @@ public class OHLCProducer implements Runnable{
     }
 
     private void addToQueue(final OHLCData data){
-        PacketsBlockingQueue.write(data);
+	try{
+            PacketsBlockingQueue.write(data);
+	}catch(InterruptedException ex){
+	    LOGGER.log(Level.SEVERE, ex.getMessage());
+	}
     }
 
     private void produce(){

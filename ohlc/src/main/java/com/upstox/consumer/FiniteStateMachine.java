@@ -1,5 +1,7 @@
 package com.upstox.consumer;
 
+import com.upstox.model.OHLCData;
+
 public class FiniteStateMachine implements Runnable{
     private void consume(){
     }

@@ -1,6 +1,6 @@
 package com.upstox.model;
 
-public class OHLC{
+public class OHLCData{
     //sym
     private final String stockName;
     //P
@@ -10,7 +10,7 @@ public class OHLC{
     //TS2
     private final long timestampUTC;
     
-    public OHLC(final String stockName, 
+    public OHLCData(final String stockName, 
                 final double priceOfTrade, 
 		final double quantityTraded, 
 		final long timestampUTC){
