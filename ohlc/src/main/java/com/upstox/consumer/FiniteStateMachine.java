@@ -17,9 +17,16 @@ public class FiniteStateMachine implements Runnable{
 
     private final Set<String> setOfStocks = new HashSet<>(100);
 
-    private final Map<String, Integer>    mapOfStockToBarNumber   = new LinkedHashMap<>();
+    private final Map<String, Double>    mapOfStockToOpen        = new LinkedHashMap<>();
+    private final Map<String, Double>    mapOfStockToHigh        = new LinkedHashMap<>();
+    private final Map<String, Double>    mapOfStockToLow         = new LinkedHashMap<>();
+    private final Map<String, Double>    mapOfStockToClose       = new LinkedHashMap<>();
+    private final Map<String, Double>    mapOfStockToVolume      = new LinkedHashMap<>();
+    private final Map<String, Integer>   mapOfStockToBarNumber   = new LinkedHashMap<>();
+
     private final Map<String, Long>       mapOfStockToFirstTrade  = new LinkedHashMap<>();
     private final Map<String, Boolean>    mapOfStockToExpiration  = new LinkedHashMap<>();
+    private final Set<String>             setOfStockWithActiveInterval = new HashSet<>();
     private final Map<String, StockState> mapOfStockToState       = new LinkedHashMap<>();
     private final Map<String, OHLCEvent>  mapOfStockToEvent       = new LinkedHashMap<>();
 
@@ -31,8 +38,27 @@ public class FiniteStateMachine implements Runnable{
 	   final long   timestampUTC = ohlcData.getTimestampUTC();
 	   expireTheStocks(timestampUTC);
 	   updateBarNum(timestampUTC);
-	   updateState(stockName, timestampUTC);
+	  // updateState(stockName, timestampUTC);
+	   updateOHLC(ohlcData);
 	}
+    }
+    
+    private void updatOHLC(final OHLCData ohlcData){
+	final String stockName    = ohlcData.getStockName();
+	final long   timestampUTC = ohlcData.getTimestampUTC();
+
+	final double currentStockPrice  = ohlcData.getPriceOfTrade();
+	final double currentTradeVolume = ohlcData.getQuantityTraded();
+
+        mapOfStockToHigh  .computeIfPresent(stockName,   (key, oldValue) -> Double.max(oldValue.doubleValue(), currentStockPrice));
+        mapOfStockToLow   .computeIfPresent(stockName,   (key, oldValue) -> Double.min(oldValue.doubleValue(), currentStockPrice));
+        mapOfStockToVolume.computeIfPresent(stockName,   (key, oldValue) -> Double.sum(oldValue.doubleValue(), currentTradeVolume));
+
+        mapOfStockToOpen  .computeIfAbsent(stockName, (key) -> currentStockPrice); 
+        mapOfStockToHigh  .computeIfAbsent(stockName, (key) -> currentStockPrice);
+        mapOfStockToLow   .computeIfAbsent(stockName, (key) -> currentStockPrice);
+        mapOfStockToClose .computeIfAbsent(stockName, (key) -> 0);
+        mapOfStockToVolume.computeIfAbsent(stockName, (key) -> currentTradeVolume);
     }
 
     private void updateState(final String stockName, final long timestampUTC){
