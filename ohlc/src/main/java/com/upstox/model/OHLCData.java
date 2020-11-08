@@ -4,13 +4,9 @@ package com.upstox.model;
 *   A class which holds OHLC details, 
 */
 public class OHLCData implements Comparable<OHLCData>{
-    //sym
     private final String stockName;
-    //P
     private final double priceOfTrade;
-    //Q
     private final double quantityTraded;
-    //TS2
     private final long timestampUTC;
     
     public OHLCData(final String stockName, 
