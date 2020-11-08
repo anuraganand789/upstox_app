@@ -13,18 +13,28 @@ import java.nio.file.Path;
 
 import java.util.logging.Logger;
 import java.util.logging.Level;
+import java.util.Timer;
+
+import java.time.temporal.ChronoUnit;
 
 import org.json.JSONObject;
 
 import com.upstox.queue.PacketsBlockingQueue;
 import com.upstox.model.OHLCData;
+import com.upstox.task.OHLCPushTask;
+
+import static com.upstox.util.TimeUtils.calculateTheTick;
 
 public class OHLCProducer implements Runnable{
 
-    private static final Logger LOGGER = Logger.getLogger(OHLCProducer.class.getName());
+    private static final Logger LOGGER            = Logger.getLogger(OHLCProducer.class.getName());
+    private static final Timer  ohlcProducerTimer = new Timer("OHLCProducerTaskExecutor");
+
+    private long   lastOHLCDataTimestamp = -1 ;
 
     private InputStream getJsonInputStream() throws IOException{
-	final InputStream ios = getClass().getClassLoader().getResourceAsStream("trades.json");
+	final String resourceName = "trades_100.json";//"trades.json"
+	final InputStream ios = getClass().getClassLoader().getResourceAsStream(resourceName);
 	LOGGER.info("Number of kilo bytes that can be read " + ios.available() / 1024 + " kB");
         return ios;
     }
@@ -40,7 +50,6 @@ public class OHLCProducer implements Runnable{
             JSONObject jsonObject;
 
 	    while((currentLine = bufferedReader.readLine()) != null){
-		LOGGER.info(currentLine);
 		jsonObject = new JSONObject(currentLine);
 	        addToQueue(jsonToOHLCData(jsonObject));
 	    }
@@ -61,11 +70,19 @@ public class OHLCProducer implements Runnable{
     }
 
     private void addToQueue(final OHLCData data){
-	try{
-            PacketsBlockingQueue.write(data);
-	}catch(InterruptedException ex){
-	    LOGGER.log(Level.SEVERE, ex.getMessage());
-	}
+        final long currentOHLCDataTimestamp = data.getTimestampUTC();
+
+        long delayInExecution = 0;
+
+        if(lastOHLCDataTimestamp == -1) { 
+            lastOHLCDataTimestamp = currentOHLCDataTimestamp; 
+        } else {
+            delayInExecution      = calculateTheTick(currentOHLCDataTimestamp, lastOHLCDataTimestamp, ChronoUnit.MILLIS);
+            lastOHLCDataTimestamp = currentOHLCDataTimestamp;
+        }
+	LOGGER.info("Added new task, It will execute after " + delayInExecution + " milliseconds ");
+        OHLCPushTask timerTask = new OHLCPushTask(data, PacketsBlockingQueue::write);
+        ohlcProducerTimer.schedule(timerTask, delayInExecution);
     }
 
     private void produce(){

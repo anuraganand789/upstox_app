@@ -16,14 +16,24 @@ public class PacketsBlockingQueue{
     private final static int INITIALSIZE = 1_000;
     private final static ArrayBlockingQueue<OHLCData> packetsQueue = new ArrayBlockingQueue<>(INITIALSIZE);
 
-    public static OHLCData read() throws InterruptedException{
-	OHLCData ohlcData = packetsQueue.take();
-	LOGGER.info("Delievered Packet " + ohlcData + ", total no of packets delivered " + noOfPacketsDelievered.incrementAndGet());
-        return ohlcData;
+    public static OHLCData read(){
+	try{
+	    OHLCData ohlcData = packetsQueue.take();
+	    //LOGGER.info("Delievered Packet " + ohlcData + ", total no of packets delivered " + noOfPacketsDelievered.incrementAndGet());
+            return ohlcData;
+	}catch(InterruptedException ex){
+	    LOGGER.info("Interrupted Exception " + ex.getMessage());
+	}
+
+	return null;
     }
 
-    public static void write(final OHLCData ohlcData) throws InterruptedException{ 
-        packetsQueue.put(ohlcData);
-        LOGGER.info("Received a new packet " + ohlcData + ", total no of packets received " + noOfPacketReceived.incrementAndGet());
+    public static void write(final OHLCData ohlcData){ 
+	try{
+            packetsQueue.put(ohlcData);
+            LOGGER.info("Received a new packet " + ohlcData + ", total no of packets received " + noOfPacketReceived.incrementAndGet());
+	}catch(InterruptedException ex){
+            LOGGER.info("Interrupted Exception " + ex.getMessage());
+	}
     }
 }

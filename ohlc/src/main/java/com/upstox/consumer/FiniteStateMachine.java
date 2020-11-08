@@ -16,9 +16,13 @@ import java.time.Duration;
 import com.upstox.queue.OHLCBarDataQueue;
 import com.upstox.queue.PacketsBlockingQueue;
 
+import java.time.temporal.ChronoUnit;
 
-//TODO: log the event packets
-//TODO: fix the bar numbers
+import static com.upstox.util.TimeUtils.calculateTheTick;
+
+//TODO: fix the bar numbers 
+//TODO: run this file and check for correct output
+//TODO: write code for websocket
 public class FiniteStateMachine implements Runnable{
 
     private static final Logger LOGGER = Logger.getLogger(FiniteStateMachine.class.getName());
@@ -66,7 +70,7 @@ public class FiniteStateMachine implements Runnable{
     private void emitEmptyEvents(final long currentTimeStamp){
         for(final String stockName : setOfStocks){
 	    if(setOfStocksWithActiveInterval.contains(stockName)){ continue; }
-            int seconds = calculateTheTick(currentTimeStamp, mapOfStockToTimeStamp.get(stockName)); 
+            int seconds = calculateTheTick(currentTimeStamp, mapOfStockToTimeStamp.get(stockName), ChronoUnit.SECONDS); 
 	    if(seconds > 14){
 	        pushEmptyEventToQueue(stockName);
 		updateLastTimeStamp(stockName, currentTimeStamp);
@@ -77,7 +81,7 @@ public class FiniteStateMachine implements Runnable{
     private void updateLastTimeStamp(final String stockName, final long currentTimestamp){
         final long lastTimestamp      = mapOfStockToTimeStamp.get(stockName);
 	final Duration lastTimeDuration = Duration.ofNanos(lastTimestamp);
-	int diffInSeconds = calculateTheTick(currentTimestamp, lastTimestamp);
+	int diffInSeconds = calculateTheTick(currentTimestamp, lastTimestamp, ChronoUnit.SECONDS);
         
 	int divisor;
 	while((divisor = diffInSeconds / 15) > 0){
@@ -128,18 +132,12 @@ public class FiniteStateMachine implements Runnable{
         //mapOfStockState.put(stockName, ohlcData);
     }
 
-    private int calculateTheTick(final long currentTimestamp, final long lastTimestamp){
-        final Duration lastDuration = Duration.ofNanos(lastTimestamp); 
-	final Duration currentDuration = Duration.ofNanos(currentTimestamp);
-        return currentDuration.minus(lastDuration).toSecondsPart();
-    }
-
     private void expireTheStocks(final String stockName, final long currentTime){
        Iterator<String> iterator = setOfStocksWithActiveInterval.iterator();
        String currentStockName;
        while(iterator.hasNext()){
            currentStockName = iterator.next(); 
-           int noOfSecondsPassed = calculateTheTick(currentTime, mapOfStockToTimeStamp.get(stockName));
+           int noOfSecondsPassed = calculateTheTick(currentTime, mapOfStockToTimeStamp.get(stockName), ChronoUnit.SECONDS);
 	   if(noOfSecondsPassed > 14) { 
 	       iterator.remove(); 
 	       //close the stock and put it in the Event Queue of Socket 
