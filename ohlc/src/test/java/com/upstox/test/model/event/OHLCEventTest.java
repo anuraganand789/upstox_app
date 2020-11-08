@@ -10,14 +10,6 @@ import com.upstox.model.event.OHLCEvent;
 import static com.upstox.model.event.TickEvent.OHLC_NOTIFY_EVENT;
 
 public class OHLCEventTest{
-       private double open;
-    private double high;
-    private double low;
-    private double close;
-    private double volume;
-    private String symbol;
-    private int    barnum;
- 
     @Test
     @DisplayName("Verifying json string for not empty Tick")
     public void ohlcTickJson(){
