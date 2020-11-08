@@ -9,15 +9,15 @@ Then run `mvn exec:java` to run the project.
 Package Structure
 -----------------
 All code comes under `com.upstox` package. 
-`model` contains the POJO to store json data
-`model.event` contains the POJO to represent tick events
-`consumer` contains class to compute the ticks after consuming data from ohlc-queue
-`queue` contains priority blocking queue to pass data and tick between processes
-`ohlc`  contains the class which the entry point of this application
-`producer` contains the class which produces OHLCData
-`socket` contains code for WebSocketServer, it is not fully implemented
-`task`   contains class which can be used to setup timer task in java
-`util`   contains classes and functions which can be used by all other classes in this project
+- `model` contains the POJO to store json data
+- `model.event` contains the POJO to represent tick events
+- `consumer` contains class to compute the ticks after consuming data from ohlc-queue
+- `queue` contains priority blocking queue to pass data and tick between processes
+- `ohlc`  contains the class which the entry point of this application
+- `producer` contains the class which produces OHLCData
+- `socket` contains code for WebSocketServer, it is not fully implemented
+- `task`   contains class which can be used to setup timer task in java
+- `util`   contains classes and functions which can be used by all other classes in this project
 
 
 About this application
