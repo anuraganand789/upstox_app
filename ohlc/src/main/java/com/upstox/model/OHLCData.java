@@ -1,6 +1,9 @@
 package com.upstox.model;
 
-public class OHLCData{
+/**
+*   A class which holds OHLC details, 
+*/
+public class OHLCData implements Comparable<OHLCData>{
     //sym
     private final String stockName;
     //P
@@ -35,6 +38,14 @@ public class OHLCData{
     public boolean equals(final Object obj){
 	if(obj instanceof OHLCData) return ((OHLCData) obj).getStockName().equals(this.stockName);
         return false;
+    }
+
+    /**
+    *   Used in priotity Queue to maintain the correct order while taking data from the queue
+    */
+    @Override
+    public int compareTo(final OHLCData ohlcData){
+        return Long.compare(this.getTimestampUTC(), ohlcData.getTimestampUTC()); 
     }
 
     @Override

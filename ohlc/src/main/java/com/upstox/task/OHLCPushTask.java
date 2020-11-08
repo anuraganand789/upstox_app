@@ -5,6 +5,9 @@ import java.util.function.Consumer;
 
 import com.upstox.model.OHLCData;
 
+/**
+*  A taks which is run by a Timer
+*/
 public class OHLCPushTask extends TimerTask{
 
     private final OHLCData ohlcData;

@@ -1,7 +1,5 @@
 package com.upstox.consumer;
 
-import com.upstox.model.OHLCData;
-import com.upstox.model.OHLCEvent;
 
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -16,40 +14,74 @@ import java.time.Duration;
 import com.upstox.queue.OHLCBarDataQueue;
 import com.upstox.queue.PacketsBlockingQueue;
 
+import com.upstox.model.OHLCData;
+
+import com.upstox.model.event.TickEvent;
+import com.upstox.model.event.EmptyEvent;
+import com.upstox.model.event.OHLCEvent;
+
 import java.time.temporal.ChronoUnit;
 
 import static com.upstox.util.TimeUtils.calculateTheTick;
 
-//TODO: fix the bar numbers 
-//TODO: run this file and check for correct output
-//TODO: write code for websocket
+/**
+*   It consumes data from OHLCData queue. 
+*   Calculates the tick and pushes it to the Tick-Queue
+*/
 public class FiniteStateMachine implements Runnable{
 
     private static final Logger LOGGER = Logger.getLogger(FiniteStateMachine.class.getName());
    
-    private final PacketsBlockingQueue blockingQueue;
-
+    /**
+    *  A set of all the stacks, read from json file
+    */
     private final Set<String> setOfStocks = new HashSet<>(100);
+    /**
+    *  Total number of active stocks
+    */
     private final Set<String> setOfStocksWithActiveInterval = new HashSet<>(100);
 
-    private final Map<String, Double>     mapOfStockToOpen        = new LinkedHashMap<>();
-    private final Map<String, Double>     mapOfStockToHigh        = new LinkedHashMap<>();
-    private final Map<String, Double>     mapOfStockToLow         = new LinkedHashMap<>();
-    private final Map<String, Double>     mapOfStockToClose       = new LinkedHashMap<>();
-    private final Map<String, Double>     mapOfStockToVolume      = new LinkedHashMap<>();
-    private final Map<String, Double>     mapOfStockToLastPrice   = new LinkedHashMap<>();
-    private final Map<String, Long>       mapOfStockToTimeStamp   = new LinkedHashMap<>();
-    private final Map<String, Integer>    mapOfStockToBarNumber   = new LinkedHashMap<>();
+    /**
+    *  contains map of Stock  to the open price of the stock
+    */
+    private final Map<String, Double>     mapOfStockToOpen          = new LinkedHashMap<>();
+    /**
+    *  contains map of Stock  to the high price of the stock
+    */
+    private final Map<String, Double>     mapOfStockToHigh          = new LinkedHashMap<>();
+    /**
+    *  contains map of Stock  to the Low price of the stock
+    */
+    private final Map<String, Double>     mapOfStockToLow           = new LinkedHashMap<>();
+    /**
+    *  contains map of Stock  to the Close price of the stock
+    */
+    private final Map<String, Double>     mapOfStockToClose         = new LinkedHashMap<>();
+    /**
+    *  contains map of Stock  to the Volume price of the stock
+    */
+    private final Map<String, Double>     mapOfStockToVolume        = new LinkedHashMap<>();
+    /**
+    *  contains map of Stock  to the LastPrice price of the stock
+    */
+    private final Map<String, Double>     mapOfStockToLastPrice     = new LinkedHashMap<>();
+    /**
+    *  contains map of Stock  to the  current starttime of the interval
+    */
+    private final Map<String, Long>       mapOfStockToIntervalStart = new LinkedHashMap<>();
+    /**
+    *  contains map of Stock  to the current endTime of the interval
+    */
+    private final Map<String, Long>       mapOfStockToIntervalEnd   = new LinkedHashMap<>();
+    /**
+    *  contains map of Stock  to the current bar number 
+    */
+    private final Map<String, Integer>    mapOfStockToBarNumber     = new LinkedHashMap<>();
 
-
-    private final Map<String, Long>       mapOfStockToFirstTrade  = new LinkedHashMap<>();
-    private final Map<String, Boolean>    mapOfStockToExpiration  = new LinkedHashMap<>();
-    private final Map<String, OHLCEvent>  mapOfStockToEvent       = new LinkedHashMap<>();
-
-    public FiniteStateMachine(final PacketsBlockingQueue blockingQueue){
-        this.blockingQueue = blockingQueue;
-    }
-
+    /**
+    *  Reads OHLCData from queue. 
+    *  And, process those data
+    */
     private void consume() throws InterruptedException{
 	OHLCData ohlcData;
         while(true){
@@ -58,44 +90,76 @@ public class FiniteStateMachine implements Runnable{
 	   final String stockName    = ohlcData.getStockName();
 	   final long   timestampUTC = ohlcData.getTimestampUTC();
 
-	   expireTheStocks(stockName, timestampUTC);
+	   expireTheStocks(timestampUTC);
+	   setOfStocks.add(stockName);
 	   updateOHLC(ohlcData);
-	   emitEmptyEvents(timestampUTC);
+	   updateBarNumber(timestampUTC);
+	   pushOHLCEventToQueue(stockName);
 	}
     }
 
-    private void pushEmptyEventToQueue(final String stockName){
-    }
+    /**
+    *  Loops through the stock, updates the bar number
+    *  @param currentTimestamp The current time received from the OHLCData packet
+    */
+    private void updateBarNumber(final long currentTimestamp){
+	for(final String stockName : setOfStocks){
+	    if(mapOfStockToBarNumber.containsKey(stockName) && !setOfStocksWithActiveInterval.contains(stockName)){
+                final long lastTimestamp        = mapOfStockToIntervalStart.get(stockName);
+	        final Duration lastTimeDuration = Duration.ofNanos(lastTimestamp);
 
-    private void emitEmptyEvents(final long currentTimeStamp){
-        for(final String stockName : setOfStocks){
-	    if(setOfStocksWithActiveInterval.contains(stockName)){ continue; }
-            int seconds = calculateTheTick(currentTimeStamp, mapOfStockToTimeStamp.get(stockName), ChronoUnit.SECONDS); 
-	    if(seconds > 14){
-	        pushEmptyEventToQueue(stockName);
-		updateLastTimeStamp(stockName, currentTimeStamp);
-	    }
+	        long diffInSeconds = calculateTheTick(currentTimestamp, lastTimestamp, ChronoUnit.SECONDS);
+		System.out.println("Update bar : diffInSeconds " + diffInSeconds);
+                
+		if(diffInSeconds > 15){
+	            long divisor;
+	            while((divisor = diffInSeconds / 15) > 0){
+	                diffInSeconds -= 15;
+                        lastTimeDuration.plusSeconds(15);
+
+	                incrementBarNum(stockName, 1);
+
+			long endOfInterval = lastTimeDuration.toNanos();
+
+			mapOfStockToIntervalEnd.put(stockName, endOfInterval);
+	                mapOfStockToIntervalStart.put(stockName, endOfInterval + 1);
+	            }
+		}
+	    } 	
 	}
+
     }
 
-    private void updateLastTimeStamp(final String stockName, final long currentTimestamp){
-        final long lastTimestamp      = mapOfStockToTimeStamp.get(stockName);
-	final Duration lastTimeDuration = Duration.ofNanos(lastTimestamp);
-	int diffInSeconds = calculateTheTick(currentTimestamp, lastTimestamp, ChronoUnit.SECONDS);
-        
-	int divisor;
-	while((divisor = diffInSeconds / 15) > 0){
-	    diffInSeconds -= 15;
-            lastTimeDuration.plusSeconds(15);
-	    incrementBarNum(stockName, 1);
-	    mapOfStockToTimeStamp.put(stockName, lastTimeDuration.toNanos());
-	}
+    /**
+    *  Creates an empty event for the given stock name.
+    *  @param stockName the stock name whose empty event is generated
+    */
+    private TickEvent createEmptyTickEvent(final String stockName){
+	return new EmptyEvent(TickEvent.OHLC_NOTIFY_EVENT, stockName, mapOfStockToBarNumber.get(stockName));
     }
 
+    /** 
+    *  Push a tick event to the blocking queue, to be consumed by WebSocketService
+    *  @param stockName stockName of the target stock, whose tick event needs to be pushed
+    */
+    private void pushOHLCEventToQueue(final String stockName){
+	final TickEvent tickEvent = createEventObject(stockName);
+	System.out.println(tickEvent);
+    }
+
+    /**
+    *   Increases the bar number of the given stock name by the amount of increseBy
+    *   @param stockName    The stock name of the target stock, whose bar number needs to be modified
+    *   @param increaseBy   the quantitiy by which bar number needs to be increased
+    */
     private void incrementBarNum(final String stockName, final int increaseBy){
         this.mapOfStockToBarNumber.computeIfPresent(stockName, (key, value) -> value + increaseBy);
     }
     
+    /**
+    *   Update O H L C parameters of a stock
+    *   @param ohlcData a ohlcData from queue
+    */
     private void updateOHLC(final OHLCData ohlcData){
         final String stockName    = ohlcData.getStockName();
 	final long   timestampUTC = ohlcData.getTimestampUTC();
@@ -121,36 +185,51 @@ public class FiniteStateMachine implements Runnable{
         mapOfStockToLow      .put(stockName, currentStockPrice);
         mapOfStockToClose    .put(stockName, 0.0);
         mapOfStockToVolume   .put(stockName, currentTradeVolume);
-	mapOfStockToTimeStamp.put(stockName, timestampUTC);
+
+	setOfStocksWithActiveInterval.add(stockName);
+
+	mapOfStockToBarNumber.putIfAbsent(stockName, 1);
+        mapOfStockToIntervalStart.putIfAbsent(stockName, timestampUTC);
     }
 
-    private void updateState(final String stockName, final long timestampUTC){
-        if(setOfStocks.add(stockName)) { 
-	    mapOfStockToFirstTrade.put(stockName, timestampUTC);
-	    incrementBarNum(stockName, 1);
-	}
-        //mapOfStockState.put(stockName, ohlcData);
-    }
-
-    private void expireTheStocks(final String stockName, final long currentTime){
-       Iterator<String> iterator = setOfStocksWithActiveInterval.iterator();
-       String currentStockName;
+    /**
+    *  Goes through the set of stocks and checks there time between start and end intervals.
+    *  And, updates their start and end intervals
+    *  @param currentTime the time which will be used to calcualte the expiration time
+    */
+    private void expireTheStocks(final long currentTime){
+       Iterator<String> iterator = setOfStocks.iterator();
+       String stockName;
        while(iterator.hasNext()){
-           currentStockName = iterator.next(); 
-           int noOfSecondsPassed = calculateTheTick(currentTime, mapOfStockToTimeStamp.get(stockName), ChronoUnit.SECONDS);
-	   if(noOfSecondsPassed > 14) { 
-	       iterator.remove(); 
-	       //close the stock and put it in the Event Queue of Socket 
+           stockName = iterator.next(); 
+           long noOfSecondsPassed = calculateTheTick(currentTime, mapOfStockToIntervalStart.get(stockName), ChronoUnit.SECONDS);
+	   if(noOfSecondsPassed > 15) { 
 	       closeTheStock(stockName);
-	       final OHLCEvent ohlcEvent = createEventObject(stockName);
-	       pushToOHLCQueue(ohlcEvent);
+	       final TickEvent tickEvent = setOfStocksWithActiveInterval.contains(stockName) ? createEventObject(stockName) : createEmptyTickEvent(stockName);
+
+	       System.out.println(tickEvent);
+	       pushToOHLCQueue(tickEvent);
+
+	       iterator.remove(); 
+
+	       mapOfStockToOpen.remove(stockName);
+	       mapOfStockToHigh.remove(stockName);
+	       mapOfStockToLow.remove(stockName);
+	       mapOfStockToClose.remove(stockName);
+	       mapOfStockToVolume.remove(stockName);
+
+               setOfStocksWithActiveInterval.remove(stockName);
+
+	       incrementBarNum(stockName, 1);
 	   } 
        }
-       //if a stock has closed then remove it from map of stock to state map, we only need the state for 15 seconds interval,
-       //after that the value is no needed.
     }
     
-    private void pushToOHLCQueue(final OHLCEvent ohlcEvent){
+    /**
+    *  A tick event generated by FiniteStateMachine.
+    *  @param ohlcEvent a tick event that needs to sent to the tick-queue
+    */
+    private void pushToOHLCQueue(final TickEvent ohlcEvent){
         try{
             OHLCBarDataQueue.write(ohlcEvent);
         }catch(InterruptedException ex){
@@ -171,8 +250,18 @@ public class FiniteStateMachine implements Runnable{
         return event;
     }
     
+    /**
+    *  Closes the stock, by updating the close time
+    *  @param stockName the name of the stock, whose interval needs to be closed
+    */
     private void closeTheStock(final String stockName){
         mapOfStockToClose.put(stockName, mapOfStockToLastPrice.get(stockName));
+
+	final long startInterval = mapOfStockToIntervalStart.get(stockName);
+	final long endInterval   = Duration.ofNanos(startInterval).plusSeconds(15).toNanos();
+
+	mapOfStockToIntervalEnd.put(stockName, endInterval);
+	mapOfStockToIntervalStart.put(stockName, endInterval + 1);
     }
 
     @Override

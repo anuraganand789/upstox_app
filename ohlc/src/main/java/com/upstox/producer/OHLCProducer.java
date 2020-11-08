@@ -25,20 +25,30 @@ import com.upstox.task.OHLCPushTask;
 
 import static com.upstox.util.TimeUtils.calculateTheTick;
 
+/**
+*  Reads data from Json file and produces OHLCData packets
+*/
 public class OHLCProducer implements Runnable{
 
     private static final Logger LOGGER            = Logger.getLogger(OHLCProducer.class.getName());
     private static final Timer  ohlcProducerTimer = new Timer("OHLCProducerTaskExecutor");
 
     private long   lastOHLCDataTimestamp = -1 ;
+    private long   delayInExecution = 0;
 
+    /** 
+    *  Loads json file from resource folder and opens a input stream.
+    */
     private InputStream getJsonInputStream() throws IOException{
-	final String resourceName = "trades_100.json";//"trades.json"
+	final String resourceName = "trades.json";
 	final InputStream ios = getClass().getClassLoader().getResourceAsStream(resourceName);
 	LOGGER.info("Number of kilo bytes that can be read " + ios.available() / 1024 + " kB");
         return ios;
     }
 
+    /**
+    *   Reads data from json file converts to OHCL data and pushes to OHLC-data queue
+    */
     private void readFile(){
 
 	try(  InputStream ioStream          = getJsonInputStream();
@@ -60,6 +70,10 @@ public class OHLCProducer implements Runnable{
 	}
     }
     
+    /**
+    *  Returns a OHLCData packet after reading data from jsonObject
+    *  @param jsonObject representation of single trade data
+    */
     private OHLCData jsonToOHLCData(final JSONObject jsonObject){
         return new OHLCData(
 		             jsonObject.getString("sym"), 
@@ -69,18 +83,19 @@ public class OHLCProducer implements Runnable{
 			   ); 
     }
 
+    /**
+    *  Creates a timertask submits that data to TimerTask to be executed after calculated delay.
+    *  Delay is calculated from timestamp of the first trade
+    *  @param data a OHLCData packet
+    */
     private void addToQueue(final OHLCData data){
         final long currentOHLCDataTimestamp = data.getTimestampUTC();
-
-        long delayInExecution = 0;
 
         if(lastOHLCDataTimestamp == -1) { 
             lastOHLCDataTimestamp = currentOHLCDataTimestamp; 
         } else {
-            delayInExecution      = calculateTheTick(currentOHLCDataTimestamp, lastOHLCDataTimestamp, ChronoUnit.MILLIS);
-            lastOHLCDataTimestamp = currentOHLCDataTimestamp;
+            delayInExecution       +=  calculateTheTick(currentOHLCDataTimestamp, lastOHLCDataTimestamp, ChronoUnit.MILLIS);
         }
-	LOGGER.info("Added new task, It will execute after " + delayInExecution + " milliseconds ");
         OHLCPushTask timerTask = new OHLCPushTask(data, PacketsBlockingQueue::write);
         ohlcProducerTimer.schedule(timerTask, delayInExecution);
     }
