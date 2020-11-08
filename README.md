@@ -3,7 +3,7 @@
 How To Set Up
 
 clone this repository using `git clone https://github.com/anuraganand789/upstox_app.git` 
-Then go to ohlc project folder and run `mvn compile` to compile the source code
+Then go to **ohlc** project folder and run `mvn compile` to compile the source code
 Then run `mvn exec:java` to run the project.
 
 Package Structure
