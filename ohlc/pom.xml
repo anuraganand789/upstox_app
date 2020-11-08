@@ -44,7 +44,7 @@
              <artifactId>exec-maven-plugin</artifactId>
              <version>3.0.0</version>
 	 <configuration>
-	    <mainClass> com.upstox.producer.OHLCProducer </mainClass>
+	    <mainClass> com.upstox.ohlc.OHLCApp </mainClass>
 	    <addResourcesToClassPath>true</addResourcesToClassPath>
 	 </configuration>
          </plugin>
@@ -111,7 +111,7 @@
               </descriptorRefs>
 	      <archive>
 	        <manifest>
-		  <mainClass>com.upstox.OHLCProducer</mainClass>
+		  <mainClass>com.upstox.ohlc.OHLCApp</mainClass>
 		</manifest>
 	      </archive>
             </configuration>
