@@ -82,8 +82,11 @@ public class FiniteStateMachine implements Runnable{
     */
     private final Map<String, Integer>    mapOfStockToBarNumber     = new LinkedHashMap<>();
     
+    /**
+    *  Maintains a map of stock to it's tick timer
+    */
     private final Map<String, AtomicInteger> mapOfStockToTick = new LinkedHashMap<>();
-    private Duration tick ;
+
     /**
     *  Reads OHLCData from queue. 
     *  And, process those data
