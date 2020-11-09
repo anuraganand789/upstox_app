@@ -259,8 +259,6 @@ public class FiniteStateMachine implements Runnable{
 	       System.out.println(tickEvent);
 	       pushToOHLCQueue(tickEvent);
 
-	       iterator.remove(); 
-
 	       mapOfStockToOpen.remove(stockName);
 	       mapOfStockToHigh.remove(stockName);
 	       mapOfStockToLow.remove(stockName);
