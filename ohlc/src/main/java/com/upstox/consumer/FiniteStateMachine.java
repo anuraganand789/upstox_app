@@ -8,6 +8,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.Iterator;
 import java.util.logging.Logger;
+import java.util.Timer;
+import java.util.TimerTask;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import java.time.Duration;
 
@@ -77,12 +81,29 @@ public class FiniteStateMachine implements Runnable{
     *  contains map of Stock  to the current bar number 
     */
     private final Map<String, Integer>    mapOfStockToBarNumber     = new LinkedHashMap<>();
-
+    
+    private final Map<String, AtomicInteger> mapOfStockToTick = new LinkedHashMap<>();
+    private Duration tick ;
     /**
     *  Reads OHLCData from queue. 
     *  And, process those data
     */
     private void consume() throws InterruptedException{
+        final Timer  tickUpdater = new Timer("Update Stock Tick");
+	tickUpdater.schedule(new TimerTask() {
+	                      @Override
+			      public void run(){
+			          for(final String stockName : setOfStocks){
+				      if(mapOfStockToTick.containsKey(stockName)) { 
+				          int remainingSecond = mapOfStockToTick.get(stockName).decrementAndGet();
+					  if(remainingSecond < 1) {
+					      expireTheStock(stockName);
+					  }
+				      }
+				  }
+			      }
+	                  }, 0, 1000);
+
 	OHLCData ohlcData;
         while(true){
 	   ohlcData = PacketsBlockingQueue.read(); 
@@ -96,6 +117,7 @@ public class FiniteStateMachine implements Runnable{
 	   updateBarNumber(timestampUTC);
 	   pushOHLCEventToQueue(stockName);
 	}
+	//tickUpdater.cancel();
     }
 
     /**
@@ -109,7 +131,6 @@ public class FiniteStateMachine implements Runnable{
 	        final Duration lastTimeDuration = Duration.ofNanos(lastTimestamp);
 
 	        long diffInSeconds = calculateTheTick(currentTimestamp, lastTimestamp, ChronoUnit.SECONDS);
-		System.out.println("Update bar : diffInSeconds " + diffInSeconds);
                 
 		if(diffInSeconds > 15){
 	            long divisor;
@@ -190,8 +211,33 @@ public class FiniteStateMachine implements Runnable{
 
 	mapOfStockToBarNumber.putIfAbsent(stockName, 1);
         mapOfStockToIntervalStart.putIfAbsent(stockName, timestampUTC);
+	mapOfStockToTick.put(stockName, new AtomicInteger(15));
     }
 
+    /**
+    *  Goes through the set of stocks and checks there time between start and end intervals.
+    *  And, updates their start and end intervals
+    *  @param currentTime the time which will be used to calcualte the expiration time
+    */
+    private void expireTheStock(final String stockName){
+        closeTheStock(stockName);
+        final TickEvent tickEvent = setOfStocksWithActiveInterval.contains(stockName) ? createEventObject(stockName) : createEmptyTickEvent(stockName);
+
+        System.out.println(tickEvent);
+
+        pushToOHLCQueue(tickEvent);
+
+	mapOfStockToOpen.remove(stockName);
+	mapOfStockToHigh.remove(stockName);
+	mapOfStockToLow.remove(stockName);
+	mapOfStockToClose.remove(stockName);
+	mapOfStockToVolume.remove(stockName);
+
+        setOfStocksWithActiveInterval.remove(stockName);
+
+	incrementBarNum(stockName, 1);
+	mapOfStockToTick.put(stockName, new AtomicInteger(15));
+    }
     /**
     *  Goes through the set of stocks and checks there time between start and end intervals.
     *  And, updates their start and end intervals
