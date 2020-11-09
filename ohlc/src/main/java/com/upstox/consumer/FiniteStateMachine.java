@@ -120,7 +120,7 @@ public class FiniteStateMachine implements Runnable{
 	   updateBarNumber(timestampUTC);
 	   pushOHLCEventToQueue(stockName);
 	}
-	//tickUpdater.cancel();
+
     }
 
     /**
