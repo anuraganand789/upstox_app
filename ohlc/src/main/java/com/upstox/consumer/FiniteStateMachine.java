@@ -33,6 +33,7 @@ import static com.upstox.util.TimeUtils.calculateTheTick;
 */
 public class FiniteStateMachine implements Runnable{
 
+    private static final byte   tickInterval = 15;
     private static final Logger LOGGER = Logger.getLogger(FiniteStateMachine.class.getName());
    
     /**
@@ -91,27 +92,26 @@ public class FiniteStateMachine implements Runnable{
     *  And, process those data
     */
     private void consume() throws InterruptedException{
-        final Timer  tickUpdater = new Timer("Update Stock Tick");
-	tickUpdater.schedule(new TimerTask() {
-	                      @Override
-			      public void run(){
-			          for(final String stockName : setOfStocks){
-				      if(mapOfStockToTick.containsKey(stockName)) { 
-				          int remainingSecond = mapOfStockToTick.get(stockName).decrementAndGet();
-					  if(remainingSecond < 1) {
-					      expireTheStock(stockName);
-					  }
-				      }
-				  }
-			      }
-	                  }, 0, 1000);
+        new Timer("Update Stock Tick")
+	                              .schedule(new TimerTask() {
+	                                                              @Override
+			                                              public void run(){
+			                                                  for(final String stockName : setOfStocks){
+			                                                      if(mapOfStockToTick.containsKey(stockName) && 
+									         mapOfStockToTick.get(stockName).decrementAndGet() < 1) { expireTheStock(stockName); }
+			                                                      }
+			                                                  }
+			                                               }, 
+						 0, 1000);
 
 	OHLCData ohlcData;
+	String stockName;
+	long timestampUTC;
         while(true){
 	   ohlcData = PacketsBlockingQueue.read(); 
 
-	   final String stockName    = ohlcData.getStockName();
-	   final long   timestampUTC = ohlcData.getTimestampUTC();
+	   stockName    = ohlcData.getStockName();
+	   timestampUTC = ohlcData.getTimestampUTC();
 
 	   expireTheStocks(timestampUTC);
 	   setOfStocks.add(stockName);
@@ -134,17 +134,18 @@ public class FiniteStateMachine implements Runnable{
 
 	        long diffInSeconds = calculateTheTick(currentTimestamp, lastTimestamp, ChronoUnit.SECONDS);
                 
-		if(diffInSeconds > 15){
+		if(diffInSeconds > tickInterval){
 	            long divisor;
-	            while((divisor = diffInSeconds / 15) > 0){
-	                diffInSeconds -= 15;
-                        lastTimeDuration.plusSeconds(15);
+		    long endOfInterval;
+	            while((divisor = diffInSeconds / tickInterval) > 0){
+	                diffInSeconds -= tickInterval;
+                        lastTimeDuration.plusSeconds(tickInterval);
 
 	                incrementBarNum(stockName, 1);
 
-			long endOfInterval = lastTimeDuration.toNanos();
+			endOfInterval = lastTimeDuration.toNanos();
 
-			mapOfStockToIntervalEnd.put(stockName, endOfInterval);
+			mapOfStockToIntervalEnd  .put(stockName, endOfInterval    );
 	                mapOfStockToIntervalStart.put(stockName, endOfInterval + 1);
 	            }
 		}
@@ -213,7 +214,7 @@ public class FiniteStateMachine implements Runnable{
 
 	mapOfStockToBarNumber.putIfAbsent(stockName, 1);
         mapOfStockToIntervalStart.putIfAbsent(stockName, timestampUTC);
-	mapOfStockToTick.put(stockName, new AtomicInteger(15));
+	mapOfStockToTick.put(stockName, new AtomicInteger(tickInterval));
     }
 
     /**
@@ -238,7 +239,7 @@ public class FiniteStateMachine implements Runnable{
         setOfStocksWithActiveInterval.remove(stockName);
 
 	incrementBarNum(stockName, 1);
-	mapOfStockToTick.put(stockName, new AtomicInteger(15));
+	mapOfStockToTick.put(stockName, new AtomicInteger(tickInterval));
     }
     /**
     *  Goes through the set of stocks and checks there time between start and end intervals.
@@ -251,7 +252,7 @@ public class FiniteStateMachine implements Runnable{
        while(iterator.hasNext()){
            stockName = iterator.next(); 
            long noOfSecondsPassed = calculateTheTick(currentTime, mapOfStockToIntervalStart.get(stockName), ChronoUnit.SECONDS);
-	   if(noOfSecondsPassed > 15) { 
+	   if(noOfSecondsPassed > tickInterval) { 
 	       closeTheStock(stockName);
 	       final TickEvent tickEvent = setOfStocksWithActiveInterval.contains(stockName) ? createEventObject(stockName) : createEmptyTickEvent(stockName);
 
@@ -304,7 +305,7 @@ public class FiniteStateMachine implements Runnable{
         mapOfStockToClose.put(stockName, mapOfStockToLastPrice.get(stockName));
 
 	final long startInterval = mapOfStockToIntervalStart.get(stockName);
-	final long endInterval   = Duration.ofNanos(startInterval).plusSeconds(15).toNanos();
+	final long endInterval   = Duration.ofNanos(startInterval).plusSeconds(tickInterval).toNanos();
 
 	mapOfStockToIntervalEnd.put(stockName, endInterval);
 	mapOfStockToIntervalStart.put(stockName, endInterval + 1);
