@@ -49,7 +49,7 @@ public class OHLCProducer implements Runnable{
     /**
     *   Reads data from json file converts to OHCL data and pushes to OHLC-data queue
     */
-    private void readFile(){
+    private void produce(){
 
 	try(  InputStream ioStream          = getJsonInputStream();
 	      InputStreamReader ioReader    = new InputStreamReader(ioStream);
@@ -96,21 +96,13 @@ public class OHLCProducer implements Runnable{
         } else {
             delayInExecution       +=  calculateTheTick(currentOHLCDataTimestamp, lastOHLCDataTimestamp, ChronoUnit.MILLIS);
         }
-        OHLCPushTask timerTask = new OHLCPushTask(data, PacketsBlockingQueue::write);
-        ohlcProducerTimer.schedule(timerTask, delayInExecution);
-    }
 
-    private void produce(){
-        readFile(); 
+        ohlcProducerTimer.schedule(new OHLCPushTask(data, PacketsBlockingQueue::write), delayInExecution);
     }
 
     public static void main(final String ... args){
-       Thread thread = new Thread(new OHLCProducer()); 
-       thread.start();
+       new Thread(new OHLCProducer()).start(); 
     }
 
-    @Override
-    public void run(){
-	produce(); 
-    }
+    @Override public void run(){ produce(); }
 }
