@@ -15,7 +15,7 @@ public class OHLCBarDataQueue{
     *  A priority Blocking queue, which stores the TickEvent
     */
 
-    private static final PriorityBlockingQueue<TickEvent> ohlcBarData = new PriorityBlockingQueue(INITIALSIZE);
+    private static final PriorityBlockingQueue<TickEvent> ohlcBarData = new PriorityBlockingQueue<>(INITIALSIZE);
 
     public static TickEvent read() throws InterruptedException{
         return ohlcBarData.take();

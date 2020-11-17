@@ -14,17 +14,23 @@ public class EmptyEvent implements TickEvent{
 	this.barnum = barnum;
     }
 
+    /**
+    *  The class to json converter library will use this function to generate json
+    */
     @Override
     public String toJSONString(){
-	final StringBuilder sb = new StringBuilder(100);
-	sb.append("{");
-	    sb.append("\"event\":");  sb.append("\""); sb.append(this.event);   sb.append("\""); sb.append(",");
-	    sb.append("\"symbol\":"); sb.append("\""); sb.append(this.symbol);  sb.append("\""); sb.append(",");
-	    sb.append("\"bar_num\":");  sb.append(this.barnum); 
-	sb.append("}");
-        return sb.toString();
+	return new StringBuilder(100)
+	                             .append("{")
+	                                 .append('"').append("event")  .append('"').append(':').append('"').append(this.event).append('"').append(',')
+	                                 .append('"').append("symbol") .append('"').append(':').append('"').append(this.symbol).append('"').append(',')
+	                                 .append('"').append("bar_num").append('"').append(':').append(this.barnum) 
+	                             .append("}")
+				                 .toString();
     }
     
+    /**
+    * All TickEvent have equal priotity
+    */
     @Override
     public int compareTo(TickEvent tickEvent){
         return 0;

@@ -12,7 +12,8 @@ public class OHLCEvent implements TickEvent{
     private String symbol;
     private int    barnum;
 
-    public OHLCEvent(final double open, final double high, final double low, final double close,
+    public OHLCEvent(final double open,   final double high, 
+                     final double low,    final double close,
                      final double volume, final String symbol, 
 		     final int    barnum){
         this.open   = open;
@@ -32,33 +33,32 @@ public class OHLCEvent implements TickEvent{
 
     public String getSymbol(){ return this.symbol; }
 
-    public int getBarnum(){ return this.barnum; }
+    public int    getBarnum(){ return this.barnum; }
 
     /**
-    *   Returns json data representation for this class
+    *   Returns json data representation for this class. This function will be used by the Json marshaller.
     */
     @Override
     public String toJSONString(){
-        StringBuilder sb = new StringBuilder(150);
+       return new StringBuilder(150)
+                                    .append('{')
+                                        .append('"')  .append("o")        .append('"').append(':') .append(this.open)     .append(',')
+                                        .append('"')  .append("h")        .append('"').append(':') .append(this.high)     .append(',')
+                                        .append('"')  .append("l")        .append('"').append(':') .append(this.low)      .append(',')
+                                        .append('"')  .append("c")        .append('"').append(':') .append(this.close)    .append(',')
 
-        sb.append("{");
+                                        .append('"')  .append("volume")   .append('"').append(':') .append(this.volume)   .append(',')
+                                        .append('"')  .append("bar_num")  .append('"').append(':') .append(this.barnum)   .append(',')
 
-            sb.append("\"o\":");        sb.append(this.open);     sb.append(",");
-            sb.append("\"h\":");        sb.append(this.high);     sb.append(",");
-            sb.append("\"l\":");        sb.append(this.low);      sb.append(",");
-            sb.append("\"c\":");        sb.append(this.close);    sb.append(",");
-
-            sb.append("\"volume\":");   sb.append(this.volume);   sb.append(",");
-            sb.append("\"bar_num\":");  sb.append(this.barnum);   sb.append(",");
-
-            sb.append("\"event\":");    sb.append("\"");          sb.append(OHLC_NOTIFY_EVENT);  sb.append("\""); sb.append(",");
-            sb.append("\"symbol\":");   sb.append("\"");          sb.append(this.symbol);        sb.append("\"");
-
-        sb.append("}");
-
-        return sb.toString();
+                                        .append('"')  .append("event")    .append('"').append(':') .append('"')           .append(OHLC_NOTIFY_EVENT)  .append('"') .append(',')
+                                        .append('"')  .append("symbol")   .append('"').append(':') .append('"')           .append(this.symbol)        .append('"')
+                                    .append('}')
+	                                        .toString();
     }
 
+    /**
+    *  All Event have equal priotity
+    */
     @Override
     public int compareTo(final TickEvent tickEvent){
        return 0; 
